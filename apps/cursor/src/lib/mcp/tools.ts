@@ -388,8 +388,12 @@ export function registerModerationTools(server: McpServer) {
         )
         .order("created_at", { ascending: false })
         .limit(limit);
-      if (plugin)
-        request = request.eq("plugin_id", await resolvePluginId(plugin));
+      // Match on the event itself so deleted plugins keep their history.
+      if (plugin) {
+        request = UUID_RE.test(plugin)
+          ? request.eq("plugin_id", plugin)
+          : request.eq("plugin_slug", plugin);
+      }
 
       const { data, error } = await request;
       if (error) {
