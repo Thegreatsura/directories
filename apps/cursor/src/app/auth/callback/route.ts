@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+// `next` comes from the query string and is appended to a base URL, so values
+// like `@evil.example` or `//evil.example` would otherwise leave the site.
+function safeNextPath(next: string | null, origin: string): string {
+  if (!next) return "/";
+  try {
+    const url = new URL(next, origin);
+    if (url.origin !== origin) return "/";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNextPath(searchParams.get("next"), origin);
 
   if (code) {
     const supabase = await createClient();
