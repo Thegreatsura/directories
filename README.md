@@ -132,3 +132,71 @@ The scan is asynchronous and runs out of the request lifecycle:
 The drain route uses `maxDuration = 800` (Vercel Pro+ Fluid Compute ceiling) and
 relies on `CURSOR_API_KEY` + `CRON_SECRET` from the env file.
 
+
+## Managing plugins via MCP (admins)
+
+Admins can moderate Community Plugins from Cursor through the MCP server at
+`/api/mcp`. It exposes the same operations as `/admin/plugins`:
+
+| Tool | Effect |
+|------|--------|
+| `list_moderation_queue` | Flagged, scan issues, verification requests, or hidden plugins |
+| `search_plugins`, `get_plugin` | Find a plugin and see its status, scan verdict, owner, and components |
+| `list_moderation_events` | Moderation audit log (web and MCP) |
+| `approve_plugin`, `approve_flagged_plugin` | Publish a hidden plugin; flagged/blocked plugins need the explicit `approve_flagged_plugin` |
+| `unpublish_plugin`, `block_plugin` | Hide a plugin, or hide and permanently block it (with a reason) |
+| `rescan_plugin` | Queue a new security scan (refused while one is in progress) |
+| `set_plugin_verified`, `dismiss_verification_request` | Manage the verified badge |
+
+Deleting plugins stays in the web admin. Write tools are rate-limited per admin
+(`mcp-moderation` Vercel Firewall rule), and every change from the web admin or
+MCP is recorded in the append-only `plugin_moderation_events` table.
+
+### How access works
+
+- Supabase Auth is the OAuth 2.1 authorization server. Cursor signs in through
+  a pre-registered public OAuth client (PKCE, no secret); dynamic client
+  registration stays off.
+- The consent page (`/oauth/consent`) only lets admins (`ADMIN_USER_IDS`)
+  approve, and only for client IDs listed in `MCP_OAUTH_CLIENT_IDS`.
+- `/api/mcp` verifies every bearer token (signature and expiry via
+  `getClaims`, plus a session check with the Auth server), requires a
+  `client_id` from `MCP_OAUTH_CLIENT_IDS`, and requires the user to be an
+  admin. Removing someone from `ADMIN_USER_IDS` or signing them out cuts off
+  MCP access immediately. Website session tokens are not accepted by the MCP
+  server, and MCP tokens are not accepted as website sessions.
+
+### Setup
+
+1. In the Supabase dashboard, enable **Authentication → OAuth Server**, set the
+   authorization path to `/oauth/consent`, and leave dynamic client
+   registration off. The Site URL must be the app's origin. Use asymmetric JWT
+   signing keys if clients request the `openid` scope. Locally,
+   `supabase/config.toml` already enables this.
+2. Apply the migrations (adds `plugin_moderation_events`).
+3. Register the OAuth client and note the printed client ID:
+
+   ```bash
+   cd apps/cursor && bun run mcp:create-oauth-client
+   ```
+
+   It registers Cursor's fixed callbacks
+   (`https://www.cursor.com/agents/mcp/oauth/callback` and
+   `http://localhost:8787/callback`); pass `--redirect-uri <url>` for others.
+4. Set `MCP_OAUTH_CLIENT_IDS` to that client ID and add the `mcp-moderation`
+   rate limit rule (60 requests / 1h, keyed by user) in Vercel Firewall.
+5. Admins add the server to their Cursor `mcp.json`:
+
+   ```json
+   {
+     "mcpServers": {
+       "cursor-directory": {
+         "url": "https://cursor.directory/api/mcp",
+         "auth": { "CLIENT_ID": "<client id>", "scopes": ["email"] }
+       }
+     }
+   }
+   ```
+
+   Cursor opens the consent page on first use. Keep the write tools out of
+   Cursor's auto-run allowlist so each change is approved by a person.
