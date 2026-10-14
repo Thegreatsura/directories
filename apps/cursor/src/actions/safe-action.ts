@@ -58,7 +58,7 @@ export const authActionClient = actionClient.use(async ({ next }) => {
 });
 
 export const adminActionClient = authActionClient.use(async ({ next, ctx }) => {
-  if (!isAdmin(ctx.userId)) {
+  if (!(await isAdmin(ctx.userId))) {
     throw new ActionError("Unauthorized: admin access required");
   }
 

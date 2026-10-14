@@ -1,25 +1,22 @@
-export function getAdminIds(): string[] {
-  return (process.env.ADMIN_USER_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-}
+import "server-only";
+import { createClient } from "@/utils/supabase/admin-client";
 
-export function isAdmin(userId: string): boolean {
-  return getAdminIds().includes(userId);
-}
+/**
+ * Whether the user is an admin (web admin and the Community Plugins MCP
+ * server). Admins are rows in `public.admins`, matched by user ID or by an
+ * email that Google or GitHub verified for one of the user's identities; see
+ * the `is_admin` SQL function. Any lookup failure counts as "not an admin".
+ */
+export async function isAdmin(userId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin", {
+    p_user_id: userId,
+  });
 
-// Browser-safe admin check. Reads NEXT_PUBLIC_ADMIN_USER_IDS, which is a
-// non-sensitive mirror used purely for conditionally rendering admin UI;
-// server-side enforcement still goes through `isAdmin` above.
-export function getPublicAdminIds(): string[] {
-  return (process.env.NEXT_PUBLIC_ADMIN_USER_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-}
+  if (error) {
+    console.error("[admin] is_admin lookup failed:", error.message);
+    return false;
+  }
 
-export function isAdminClient(userId: string | null | undefined): boolean {
-  if (!userId) return false;
-  return getPublicAdminIds().includes(userId);
+  return data === true;
 }

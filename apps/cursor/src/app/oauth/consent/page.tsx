@@ -101,7 +101,7 @@ async function ConsentContent({
     );
   }
 
-  const admin = isAdmin(session.user.id);
+  const admin = await isAdmin(session.user.id);
   const signedInAs = (
     <p>
       Signed in as{" "}

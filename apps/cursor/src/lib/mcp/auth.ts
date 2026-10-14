@@ -118,7 +118,7 @@ export async function verifyMcpAccessToken(
   const extra: McpAuthExtra = {
     userId: claims.sub,
     email: claims.email ?? null,
-    isAdmin: isAdmin(claims.sub),
+    isAdmin: await isAdmin(claims.sub),
   };
 
   return {

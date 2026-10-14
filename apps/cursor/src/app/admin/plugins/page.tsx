@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 async function AdminPluginsContent() {
   const session = await getSession();
 
-  if (!session || !isAdmin(session.user.id)) {
+  if (!session || !(await isAdmin(session.user.id))) {
     redirect("/");
   }
 
