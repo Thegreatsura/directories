@@ -1,9 +1,37 @@
 import { createClient } from "./server";
 
-export async function getSession() {
+export type VerifiedSession = {
+  user: {
+    id: string;
+    email: string | undefined;
+    user_metadata: Record<string, unknown>;
+  };
+};
+
+/**
+ * The signed-in user, read from the access token's verified claims.
+ *
+ * `supabase.auth.getSession()` returns whatever the session cookie contains
+ * without checking the token signature, so its `user` must never back an
+ * authorization decision on the server. `getClaims()` verifies the JWT
+ * (against the project's JWKS, or via the Auth server for symmetric keys)
+ * before we trust `sub`.
+ */
+export async function getSession(): Promise<VerifiedSession | null> {
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session;
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (error || !data?.claims.sub) {
+    return null;
+  }
+
+  const { claims } = data;
+
+  return {
+    user: {
+      id: claims.sub,
+      email: claims.email,
+      user_metadata: claims.user_metadata ?? {},
+    },
+  };
 }
