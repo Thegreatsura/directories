@@ -13,6 +13,7 @@ import { headers } from "next/headers";
  *   install-per-plugin   3 requests / 24h   (key: `${ip}:${pluginId}`)
  *   install-global       20 requests / 1h   (key: ip, default)
  *   plugin-scan          5 requests / 1h    (key: userId)
+ *   mcp-moderation       60 requests / 1h   (key: userId)
  *
  * In non-production, `checkRateLimit` is a no-op unless
  * `NEXT_PUBLIC_VERCEL_FIREWALL_HOST_FOR_DEVELOPMENT` is set to a deployed host
@@ -22,6 +23,7 @@ const RATE_LIMIT_IDS = {
   installPerPlugin: "install-per-plugin",
   installGlobal: "install-global",
   pluginScan: "plugin-scan",
+  mcpModeration: "mcp-moderation",
 } as const;
 
 const firewallHostForDevelopment =
@@ -85,6 +87,15 @@ export async function installGlobalLimit(): Promise<LimitResult> {
 export async function pluginScanLimit(userId: string): Promise<LimitResult> {
   return check({
     rateLimitId: RATE_LIMIT_IDS.pluginScan,
+    rateLimitKey: userId,
+  });
+}
+
+// Write tools on the MCP server; caps runaway agent loops (re-scans are
+// billable Cursor SDK runs).
+export async function mcpModerationLimit(userId: string): Promise<LimitResult> {
+  return check({
+    rateLimitId: RATE_LIMIT_IDS.mcpModeration,
     rateLimitKey: userId,
   });
 }

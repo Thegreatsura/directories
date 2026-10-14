@@ -1,0 +1,104 @@
+import "server-only";
+import type { AuthInfo } from "@modelcontextprotocol/server";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { isAdmin } from "@/utils/admin";
+
+export const MCP_RESOURCE_PATH = "/api/mcp";
+
+// RFC 9728 path-suffixed metadata location for the resource above.
+export const MCP_RESOURCE_METADATA_PATH = `/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}`;
+
+/** Supabase Auth acts as the OAuth 2.1 authorization server for the MCP. */
+export function getMcpAuthorizationServerUrl(): string {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`;
+}
+
+/**
+ * OAuth client IDs whose access tokens the MCP server accepts and that the
+ * consent page lets admins approve (comma-separated `MCP_OAUTH_CLIENT_IDS`).
+ */
+export function getMcpClientIds(): string[] {
+  return (process.env.MCP_OAUTH_CLIENT_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+export function isMcpClient(clientId: string | null | undefined): boolean {
+  return !!clientId && getMcpClientIds().includes(clientId);
+}
+
+export type McpAuthExtra = {
+  userId: string;
+  email: string | null;
+  isAdmin: boolean;
+};
+
+let verifier: SupabaseClient | null = null;
+
+// Tokens are always passed explicitly and never stored, so one stateless
+// client is safe to share across requests (and keeps the JWKS cache warm).
+function getVerifier(): SupabaseClient {
+  verifier ??= createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  return verifier;
+}
+
+/**
+ * `withMcpAuth` verifier. Returns `undefined` (→ 401 with an RFC 9728
+ * challenge) unless the bearer token is a live Supabase access token issued
+ * to one of the registered MCP OAuth clients. Admin status is reported in
+ * `extra` and enforced by the route.
+ */
+export async function verifyMcpAccessToken(
+  _req: Request,
+  bearerToken?: string,
+): Promise<AuthInfo | undefined> {
+  if (!bearerToken) return undefined;
+
+  const supabase = getVerifier();
+  const { data, error } = await supabase.auth.getClaims(bearerToken);
+  if (error || !data) return undefined;
+
+  const { claims } = data;
+  const clientId =
+    typeof claims.client_id === "string" ? claims.client_id : undefined;
+
+  // Website session tokens have no client_id, and tokens minted for any other
+  // OAuth client are not valid for this resource.
+  if (!clientId || !isMcpClient(clientId)) return undefined;
+  if (claims.role !== "authenticated" || !claims.sub) return undefined;
+
+  // getClaims checks the signature and expiry; getUser additionally confirms
+  // with the Auth server that the session hasn't been signed out or revoked
+  // and the user still exists.
+  const { data: userData, error: userError } =
+    await supabase.auth.getUser(bearerToken);
+  if (userError || userData.user?.id !== claims.sub) return undefined;
+
+  const extra: McpAuthExtra = {
+    userId: claims.sub,
+    email: claims.email ?? null,
+    isAdmin: isAdmin(claims.sub),
+  };
+
+  return {
+    token: bearerToken,
+    clientId,
+    scopes:
+      typeof claims.scope === "string"
+        ? claims.scope.split(" ").filter(Boolean)
+        : [],
+    expiresAt: claims.exp,
+    extra,
+  };
+}
