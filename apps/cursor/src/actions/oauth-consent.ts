@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { isMcpClient } from "@/lib/mcp/auth";
+import { getMcpAuthorizationDetails, isMcpClient } from "@/lib/mcp/auth";
 import { createClient } from "@/utils/supabase/server";
 import {
   ActionError,
@@ -23,8 +23,10 @@ export const approveOAuthAuthorizationAction = adminActionClient
   .schema(authorizationSchema)
   .action(async ({ parsedInput: { authorizationId } }) => {
     const supabase = await createClient();
-    const { data: details, error } =
-      await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    const { data: details, error } = await getMcpAuthorizationDetails(
+      supabase,
+      authorizationId,
+    );
 
     if (error || !details) {
       throw new ActionError(
@@ -32,7 +34,8 @@ export const approveOAuthAuthorizationAction = adminActionClient
       );
     }
 
-    // Already approved earlier: the Auth server has issued the redirect.
+    // Already approved earlier (only possible for allowlisted clients): the
+    // Auth server has issued the redirect.
     if (!("authorization_id" in details)) {
       return { redirectUrl: details.redirect_url };
     }

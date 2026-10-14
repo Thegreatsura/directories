@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { type ReactNode, Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
-import { isMcpClient } from "@/lib/mcp/auth";
+import { getMcpAuthorizationDetails, isMcpClient } from "@/lib/mcp/auth";
 import { isAdmin } from "@/utils/admin";
 import { getSession } from "@/utils/supabase/auth";
 import { createClient } from "@/utils/supabase/server";
@@ -87,8 +87,10 @@ async function ConsentContent({
   }
 
   const supabase = await createClient();
-  const { data: details, error } =
-    await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+  const { data: details, error } = await getMcpAuthorizationDetails(
+    supabase,
+    authorizationId,
+  );
 
   if (error || !details) {
     return (
@@ -110,10 +112,10 @@ async function ConsentContent({
     </p>
   );
 
-  // The user approved this client before, so the Auth server already issued
-  // the authorization code when we fetched the details. Still require a click
-  // instead of redirecting, so a crafted link can't silently complete
-  // someone else's sign-in.
+  // The user approved this (allowlisted) client before, so the Auth server
+  // already issued the authorization code when we fetched the details. Still
+  // require a click instead of redirecting, so a crafted link can't silently
+  // complete someone else's sign-in.
   if (!("authorization_id" in details)) {
     const continueUrl = parseHttpUrl(details.redirect_url);
     if (!admin || !continueUrl) {

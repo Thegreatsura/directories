@@ -1,6 +1,10 @@
 import "server-only";
 import type { AuthInfo } from "@modelcontextprotocol/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  type AuthOAuthAuthorizationDetailsResponse,
+  createClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { isAdmin } from "@/utils/admin";
 
 export const MCP_RESOURCE_PATH = "/api/mcp";
@@ -26,6 +30,32 @@ export function getMcpClientIds(): string[] {
 
 export function isMcpClient(clientId: string | null | undefined): boolean {
   return !!clientId && getMcpClientIds().includes(clientId);
+}
+
+/**
+ * `getAuthorizationDetails` for the consent flow. For a client the user
+ * approved before, the Auth server approves on this call and returns only the
+ * redirect URL, without the client. Revoking the user's grants to clients
+ * outside MCP_OAUTH_CLIENT_IDS first means only allowlisted clients are ever
+ * approved that way; any other client comes back as a pending request, which
+ * the consent page refuses.
+ */
+export async function getMcpAuthorizationDetails(
+  supabase: SupabaseClient,
+  authorizationId: string,
+): Promise<AuthOAuthAuthorizationDetailsResponse> {
+  const { data: grants, error } = await supabase.auth.oauth.listGrants();
+  if (error) return { data: null, error };
+
+  for (const { client } of grants) {
+    if (isMcpClient(client.id)) continue;
+    const { error: revokeError } = await supabase.auth.oauth.revokeGrant({
+      clientId: client.id,
+    });
+    if (revokeError) return { data: null, error: revokeError };
+  }
+
+  return supabase.auth.oauth.getAuthorizationDetails(authorizationId);
 }
 
 export type McpAuthExtra = {
