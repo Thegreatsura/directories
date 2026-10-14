@@ -519,7 +519,7 @@ export function registerModerationTools(server: McpServer) {
       }
       return changed(
         "Blocked",
-        await blockPlugin(await beginWrite(admin), state.id, reason),
+        await blockPlugin(await beginWrite(admin), state.id, { reason }),
       );
     }),
   );

@@ -192,7 +192,7 @@ export function approveFlaggedPlugin(ctx: ModerationContext, pluginId: string) {
 export function blockPlugin(
   ctx: ModerationContext,
   pluginId: string,
-  reason?: string,
+  { reason }: { reason?: string } = {},
 ) {
   return updatePlugin(
     ctx,
