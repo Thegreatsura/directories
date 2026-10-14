@@ -152,18 +152,42 @@ Deleting plugins stays in the web admin. Write tools are rate-limited per admin
 (`mcp-moderation` Vercel Firewall rule), and every change from the web admin or
 MCP is recorded in the append-only `plugin_moderation_events` table.
 
+### Who is an admin
+
+Admins are rows in the `public.admins` table, which also controls
+`/admin/plugins`. Add or remove people in the Supabase dashboard (Table
+Editor → `admins`) or with SQL. Changes apply on the next request; nothing
+needs a redeploy. Fill in one of:
+
+- `user_id`: an existing account (`auth.users.id`).
+- `email`: someone who hasn't signed in yet, or any of their accounts. It only
+  matches a Google or GitHub sign-in whose provider verified that address; an
+  email typed into an email/password signup never counts.
+
+```sql
+-- By email, works before they sign in with Google or GitHub
+insert into public.admins (email, note) values ('jane@cursor.com', 'plugin moderation');
+
+-- By account (check it's the right one first)
+insert into public.admins (user_id, note)
+select id, 'plugin moderation' from auth.users where email = 'jane@cursor.com';
+
+-- Remove
+delete from public.admins where email = 'jane@cursor.com';
+```
+
 ### How access works
 
 - Supabase Auth is the OAuth 2.1 authorization server. Cursor signs in through
   a pre-registered public OAuth client (PKCE, no secret); dynamic client
   registration stays off.
-- The consent page (`/oauth/consent`) only lets admins (`ADMIN_USER_IDS`)
-  approve, and only for client IDs listed in `MCP_OAUTH_CLIENT_IDS`.
+- The consent page (`/oauth/consent`) only lets admins approve, and only for
+  client IDs listed in `MCP_OAUTH_CLIENT_IDS`.
 - `/api/mcp` verifies every bearer token (signature and expiry via
   `getClaims`, plus a session check with the Auth server), requires a
   `client_id` from `MCP_OAUTH_CLIENT_IDS`, and requires the user to be an
-  admin. Removing someone from `ADMIN_USER_IDS` or signing them out cuts off
-  MCP access immediately. Website session tokens are not accepted by the MCP
+  admin. Deleting someone's `admins` row or signing them out cuts off MCP
+  access immediately. Website session tokens are not accepted by the MCP
   server, and MCP tokens are not accepted as website sessions.
 
 ### Setup
@@ -173,7 +197,17 @@ MCP is recorded in the append-only `plugin_moderation_events` table.
    registration off. The Site URL must be the app's origin. Use asymmetric JWT
    signing keys if clients request the `openid` scope. Locally,
    `supabase/config.toml` already enables this.
-2. Apply the migrations (adds `plugin_moderation_events`).
+2. Apply the migrations (adds `plugin_moderation_events` and `admins`) and add
+   the admins. When moving off the old `ADMIN_USER_IDS` env var, copy its IDs
+   in before deploying, then delete `ADMIN_USER_IDS` and
+   `NEXT_PUBLIC_ADMIN_USER_IDS`:
+
+   ```sql
+   insert into public.admins (user_id, note)
+   select btrim(id)::uuid, 'migrated from ADMIN_USER_IDS'
+   from unnest(string_to_array('<ADMIN_USER_IDS value>', ',')) as id;
+   ```
+
 3. Register the OAuth client and note the printed client ID:
 
    ```bash
@@ -200,3 +234,8 @@ MCP is recorded in the append-only `plugin_moderation_events` table.
 
    Cursor opens the consent page on first use. Keep the write tools out of
    Cursor's auto-run allowlist so each change is approved by a person.
+
+   Prefer this per-admin `mcp.json` entry over a Cursor Team MCP server: team
+   servers are also available to Cloud Agents, which run tools without asking
+   for approval, and Cursor's docs don't say whether team servers accept a
+   pre-registered OAuth client ID.
