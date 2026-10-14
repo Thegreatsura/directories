@@ -1,38 +1,21 @@
 "use server";
 
-import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/utils/supabase/admin-client";
-import { ActionError, adminActionClient } from "./safe-action";
+import {
+  approvePlugin,
+  deletePlugin,
+  unpublishPlugin,
+  webModerationContext,
+} from "@/lib/plugins/moderation";
+import { adminActionClient } from "./safe-action";
+
+const pluginIdSchema = z.object({ pluginId: z.string().uuid() });
 
 export const approvePluginAction = adminActionClient
   .metadata({ actionName: "approve-plugin" })
-  .schema(z.object({ pluginId: z.string().uuid() }))
-  .action(async ({ parsedInput: { pluginId } }) => {
-    const supabase = await createClient();
-
-    const { error } = await supabase
-      .from("plugins")
-      .update({ active: true })
-      .eq("id", pluginId);
-
-    if (error) {
-      throw new ActionError(`Failed to approve plugin: ${error.message}`);
-    }
-
-    const { data: plugin } = await supabase
-      .from("plugins")
-      .select("slug")
-      .eq("id", pluginId)
-      .single();
-
-    revalidatePath("/admin/plugins");
-    updateTag("plugins");
-
-    if (plugin?.slug) {
-      updateTag(`plugin-${plugin.slug}`);
-    }
-
+  .schema(pluginIdSchema)
+  .action(async ({ parsedInput: { pluginId }, ctx: { userId } }) => {
+    await approvePlugin(webModerationContext(userId), pluginId);
     return { success: true };
   });
 
@@ -43,47 +26,16 @@ export const approvePluginAction = adminActionClient
  */
 export const unpublishPluginAction = adminActionClient
   .metadata({ actionName: "unpublish-plugin" })
-  .schema(z.object({ pluginId: z.string().uuid() }))
-  .action(async ({ parsedInput: { pluginId } }) => {
-    const supabase = await createClient();
-
-    const { data: plugin, error } = await supabase
-      .from("plugins")
-      .update({ active: false })
-      .eq("id", pluginId)
-      .select("slug")
-      .single();
-
-    if (error || !plugin) {
-      throw new ActionError(
-        `Failed to unpublish plugin: ${error?.message ?? "not found"}`,
-      );
-    }
-
-    revalidatePath("/admin/plugins");
-    updateTag("plugins");
-    updateTag(`plugin-${plugin.slug}`);
-
+  .schema(pluginIdSchema)
+  .action(async ({ parsedInput: { pluginId }, ctx: { userId } }) => {
+    await unpublishPlugin(webModerationContext(userId), pluginId);
     return { success: true };
   });
 
 export const declinePluginAction = adminActionClient
   .metadata({ actionName: "decline-plugin" })
-  .schema(z.object({ pluginId: z.string().uuid() }))
-  .action(async ({ parsedInput: { pluginId } }) => {
-    const supabase = await createClient();
-
-    const { error } = await supabase
-      .from("plugins")
-      .delete()
-      .eq("id", pluginId);
-
-    if (error) {
-      throw new ActionError(`Failed to decline plugin: ${error.message}`);
-    }
-
-    revalidatePath("/admin/plugins");
-    updateTag("plugins");
-
+  .schema(pluginIdSchema)
+  .action(async ({ parsedInput: { pluginId }, ctx: { userId } }) => {
+    await deletePlugin(webModerationContext(userId), pluginId);
     return { success: true };
   });
