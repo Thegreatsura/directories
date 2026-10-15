@@ -18,7 +18,7 @@ export function GoogleSignin({ redirectTo }: { redirectTo?: string }) {
         supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
           },
         });
       }}

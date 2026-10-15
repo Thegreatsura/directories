@@ -3,6 +3,7 @@ import {
   DEFAULT_SERVER_ERROR_MESSAGE,
 } from "next-safe-action";
 import { z } from "zod";
+import { ModerationError } from "@/lib/plugins/moderation";
 import { isAdmin } from "@/utils/admin";
 import { getSession } from "@/utils/supabase/auth";
 
@@ -13,7 +14,7 @@ export const actionClient = createSafeActionClient({
   handleServerError(e) {
     console.error("Action error:", e.message);
 
-    if (e instanceof ActionError) {
+    if (e instanceof ActionError || e instanceof ModerationError) {
       return e.message;
     }
 
@@ -57,7 +58,7 @@ export const authActionClient = actionClient.use(async ({ next }) => {
 });
 
 export const adminActionClient = authActionClient.use(async ({ next, ctx }) => {
-  if (!isAdmin(ctx.userId)) {
+  if (!(await isAdmin(ctx.userId))) {
     throw new ActionError("Unauthorized: admin access required");
   }
 

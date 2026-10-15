@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
-import { type ReactNode, useEffect, useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   approveFlaggedPluginAction,
@@ -35,10 +35,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import type { FlagSeverity, PluginRow, ScanStatus } from "@/lib/plugins/types";
 import { cn } from "@/lib/utils";
-import { isAdminClient } from "@/utils/admin";
-import { createClient } from "@/utils/supabase/client";
 
 const severityClass: Record<FlagSeverity, string> = {
   high: "bg-red-500/15 text-red-500 border-red-500/30",
@@ -81,22 +80,14 @@ type Props = {
 /**
  * Moderation toolbar shown only to admins on the public plugin page, so the
  * queue actions (approve, re-scan, confirm flag, unpublish, delete) don't
- * require a round trip to /admin/plugins. Rendering is gated client-side via
- * NEXT_PUBLIC_ADMIN_USER_IDS; every action is enforced server-side by
- * `adminActionClient`.
+ * require a round trip to /admin/plugins. Rendering is gated client-side by
+ * `useIsAdmin`; every action is enforced server-side by `adminActionClient`.
  */
 export function PluginAdminPanel({ plugin }: Props) {
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = useIsAdmin();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isRefreshing, startRefresh] = useTransition();
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAdmin(isAdminClient(session?.user.id ?? null));
-    });
-  }, []);
 
   // The actions invalidate the detail cache tag; refresh so the panel and the
   // rest of the page re-render with the new row. The transition keeps the

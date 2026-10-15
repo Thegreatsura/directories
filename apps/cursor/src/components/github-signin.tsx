@@ -18,7 +18,7 @@ export function GithubSignin({ redirectTo }: { redirectTo?: string }) {
         supabase.auth.signInWithOAuth({
           provider: "github",
           options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
           },
         });
       }}

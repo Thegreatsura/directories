@@ -2,31 +2,21 @@
 
 import { BadgeCheck, BadgeMinus, Check, Loader2, X } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   dismissVerificationRequestAction,
   setPluginVerifiedAction,
 } from "@/actions/verify-plugin";
 import { Button } from "@/components/ui/button";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import type { PluginRow } from "@/lib/plugins/types";
-import { isAdminClient } from "@/utils/admin";
-import { createClient } from "@/utils/supabase/client";
 
 type Props = {
   plugin: PluginRow;
 };
 
 export function VerifyControls({ plugin }: Props) {
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const userId = session?.user.id ?? null;
-      setIsAdmin(isAdminClient(userId));
-    });
-  }, []);
+  const isAdmin = useIsAdmin();
 
   const requestPending = !!plugin.verification_requested_at;
 
