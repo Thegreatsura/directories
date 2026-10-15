@@ -101,10 +101,11 @@ export async function verifyMcpAccessToken(
   if (!bearerToken) return undefined;
 
   const supabase = getVerifier();
-  const { data, error } = await supabase.auth.getClaims(bearerToken);
-  if (error || !data) return undefined;
+  // getClaims throws, rather than returning an error, for an expired token.
+  const result = await supabase.auth.getClaims(bearerToken).catch(() => null);
+  if (!result || result.error || !result.data) return undefined;
 
-  const { claims } = data;
+  const { claims } = result.data;
   const clientId =
     typeof claims.client_id === "string" ? claims.client_id : undefined;
 
