@@ -330,47 +330,59 @@ export async function getMCPBySlug(slug: string) {
 // Plugins (Open Plugins spec)
 // ---------------------------------------------------------------------------
 
-export async function getPlugins({
-  page = 1,
-  limit = 36,
-  fetchAll = false,
-}: {
-  page?: number;
-  limit?: number;
-  fetchAll?: boolean;
-} = {}): Promise<{ data: PluginRow[] | null; error: unknown }> {
+type PluginListing = Pick<
+  PluginRow,
+  | "id"
+  | "name"
+  | "slug"
+  | "description"
+  | "logo"
+  | "author_name"
+  | "author_url"
+  | "verified"
+  | "install_count"
+  | "star_count"
+  | "created_at"
+  | "updated_at"
+  | "permanently_blocked"
+  | "flag_severity"
+  | "scan_status"
+>;
+
+// Every active plugin for the homepage leaderboard, plugin static params and
+// the sitemap. Keep component content out: with it the list is ~30 MB and the
+// homepage's cache fill times out during builds. Pages are 100 rows because
+// that's the production Data API's max rows per request; with a larger page
+// size `fetchAllPages` would stop after the first page.
+export async function getPluginListing(): Promise<{
+  data: PluginListing[] | null;
+  error: unknown;
+}> {
   "use cache";
   cacheLife("hours");
   cacheTag("plugins");
 
   const supabase = await createClient();
 
-  const baseQuery = () =>
-    supabase
+  return fetchAllPages<PluginListing>(async (from, to) => {
+    const { data, error } = await supabase
       .from("plugins")
-      .select("*, plugin_components(*)")
+      .select(
+        "id, name, slug, description, logo, author_name, author_url, verified, install_count, star_count, created_at, updated_at, permanently_blocked, flag_severity, scan_status",
+      )
       .eq("active", true)
-      .order("created_at", { ascending: false });
-
-  if (fetchAll) {
-    return fetchAllPages<PluginRow>(async (from, to) => {
-      const { data, error } = await baseQuery().range(from, to);
-      return { data: data as PluginRow[] | null, error };
-    }, 100);
-  }
-
-  const { data, error } = await baseQuery()
-    .limit(limit)
-    .range((page - 1) * limit, page * limit - 1);
-
-  return { data: data as PluginRow[] | null, error };
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to);
+    return { data: data as PluginListing[] | null, error };
+  }, 100);
 }
 
 // Slugs of every `rule` component on an active plugin. Legacy rule URLs
 // (`/{rule-slug}`) prerender a redirect to the parent plugin, and there are
 // thousands of them — they need a slugs-only query. Building the list from
-// `getPlugins({ fetchAll: true })` (full table, all columns, serial pages)
-// inside every prerendering page caused `USE_CACHE_TIMEOUT` build failures.
+// the full plugins list inside every prerendering page caused
+// `USE_CACHE_TIMEOUT` build failures.
 export async function getRuleRedirectSlugs() {
   "use cache";
   cacheLife("hours");

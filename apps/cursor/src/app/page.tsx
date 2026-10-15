@@ -4,7 +4,7 @@ import type { LeaderboardItem } from "@/components/plugins/plugin-leaderboard";
 import { Startpage } from "@/components/startpage";
 import {
   getPluginInstallVelocity,
-  getPlugins,
+  getPluginListing,
   getTotalUsers,
 } from "@/data/queries";
 
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 function toLeaderboardItem(
-  p: NonNullable<Awaited<ReturnType<typeof getPlugins>>["data"]>[number],
+  p: NonNullable<Awaited<ReturnType<typeof getPluginListing>>["data"]>[number],
   installs30d: number,
 ): LeaderboardItem {
   return {
@@ -65,7 +65,7 @@ export default async function Page() {
     { data: velocityMap },
   ] = await Promise.all([
     getTotalUsers(),
-    getPlugins({ fetchAll: true }),
+    getPluginListing(),
     getPluginInstallVelocity(30),
   ]);
 

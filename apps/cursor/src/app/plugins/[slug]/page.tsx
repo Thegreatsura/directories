@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PluginDetailView } from "@/components/plugins/plugin-detail";
-import { getPluginBySlug, getPlugins } from "@/data/queries";
+import { getPluginBySlug, getPluginListing } from "@/data/queries";
 
 type Params = Promise<{ slug: string }>;
 
@@ -41,7 +41,7 @@ export async function generateMetadata({
 }
 
 export async function generateStaticParams() {
-  const { data: plugins } = await getPlugins({ fetchAll: true });
+  const { data: plugins } = await getPluginListing();
   return (plugins ?? []).map((p) => ({ slug: p.slug }));
 }
 
