@@ -24,10 +24,11 @@ const PRODUCTION_MCP_CLIENT_ID = "12bb4179-e29a-4f99-a718-335ef4d0edb2";
 /**
  * OAuth client IDs whose access tokens the MCP server accepts and that the
  * consent page lets admins approve. A comma-separated `MCP_OAUTH_CLIENT_IDS`
- * replaces the production client, e.g. for a local Supabase stack.
+ * replaces the production client, e.g. for a local Supabase stack. Empty
+ * counts as unset, since Vercel and `.env` files keep empty values.
  */
 export function getMcpClientIds(): string[] {
-  return (process.env.MCP_OAUTH_CLIENT_IDS ?? PRODUCTION_MCP_CLIENT_ID)
+  return (process.env.MCP_OAUTH_CLIENT_IDS || PRODUCTION_MCP_CLIENT_ID)
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
