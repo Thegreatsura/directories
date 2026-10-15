@@ -182,11 +182,12 @@ delete from public.admins where email = 'jane@cursor.com';
   a pre-registered public OAuth client (PKCE, no secret); dynamic client
   registration stays off.
 - The consent page (`/oauth/consent`) only lets admins approve, and only for
-  client IDs listed in `MCP_OAUTH_CLIENT_IDS`.
+  the allowlisted OAuth client. The production client's ID is built into
+  `src/lib/mcp/auth.ts`; a comma-separated `MCP_OAUTH_CLIENT_IDS` replaces it,
+  for example for a local Supabase stack.
 - `/api/mcp` verifies every bearer token (signature and expiry via
-  `getClaims`, plus a session check with the Auth server), requires a
-  `client_id` from `MCP_OAUTH_CLIENT_IDS`, and requires the user to be an
-  admin. Deleting someone's `admins` row or signing them out cuts off MCP
+  `getClaims`, plus a session check with the Auth server), requires the
+  allowlisted `client_id`, and requires the user to be an admin. Deleting someone's `admins` row or signing them out cuts off MCP
   access immediately. Website session tokens are not accepted by the MCP
   server, and MCP tokens are not accepted as website sessions.
 
@@ -208,7 +209,9 @@ delete from public.admins where email = 'jane@cursor.com';
    from unnest(string_to_array('<ADMIN_USER_IDS value>', ',')) as id;
    ```
 
-3. Register the OAuth client and note the printed client ID:
+3. Production's OAuth client is already registered and built in. For another
+   Supabase project, register one and set `MCP_OAUTH_CLIENT_IDS` to the
+   printed client ID:
 
    ```bash
    cd apps/cursor && bun run mcp:create-oauth-client
@@ -217,8 +220,9 @@ delete from public.admins where email = 'jane@cursor.com';
    It registers Cursor's fixed callbacks
    (`https://www.cursor.com/agents/mcp/oauth/callback` and
    `http://localhost:8787/callback`); pass `--redirect-uri <url>` for others.
-4. Set `MCP_OAUTH_CLIENT_IDS` to that client ID and add the `mcp-moderation`
-   rate limit rule (60 requests / 1h, keyed by user) in Vercel Firewall.
+4. Add the `mcp-moderation` rate limit rule (60 requests / 1h, keyed by user)
+   in Vercel Firewall. Until it exists, write tools aren't rate limited and
+   the server logs an error.
 5. Admins add the server to their Cursor `mcp.json`:
 
    ```json
@@ -226,7 +230,10 @@ delete from public.admins where email = 'jane@cursor.com';
      "mcpServers": {
        "cursor-directory": {
          "url": "https://cursor.directory/api/mcp",
-         "auth": { "CLIENT_ID": "<client id>", "scopes": ["email"] }
+         "auth": {
+           "CLIENT_ID": "12bb4179-e29a-4f99-a718-335ef4d0edb2",
+           "scopes": ["email"]
+         }
        }
      }
    }

@@ -1,7 +1,8 @@
 /**
  * Registers the public OAuth client Cursor uses to sign in to the Community
  * Plugins MCP server (/api/mcp) and prints its client ID, which goes into
- * MCP_OAUTH_CLIENT_IDS and the `auth.CLIENT_ID` of each admin's mcp.json.
+ * the app's allowlist (PRODUCTION_MCP_CLIENT_ID in src/lib/mcp/auth.ts, or
+ * MCP_OAUTH_CLIENT_IDS) and the `auth.CLIENT_ID` of each admin's mcp.json.
  *
  * Re-running is safe: an existing client with the same name is reused, and
  * any missing redirect URIs are added to it.
@@ -96,7 +97,8 @@ client_id:     ${client.client_id}
 redirect_uris: ${client.redirect_uris.join(", ")}
 
 Next steps:
-  1. Add the client ID to MCP_OAUTH_CLIENT_IDS in the app environment.
+  1. Allowlist it: MCP_OAUTH_CLIENT_IDS in the app environment, or
+     PRODUCTION_MCP_CLIENT_ID in src/lib/mcp/auth.ts for production.
   2. Admins add this to their Cursor mcp.json:
 
      "cursor-directory": {

@@ -17,12 +17,17 @@ export function getMcpAuthorizationServerUrl(): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`;
 }
 
+// "Cursor (Community Plugins MCP)", the public client registered in the
+// production Supabase project. Not a secret: admins put it in their mcp.json.
+const PRODUCTION_MCP_CLIENT_ID = "12bb4179-e29a-4f99-a718-335ef4d0edb2";
+
 /**
  * OAuth client IDs whose access tokens the MCP server accepts and that the
- * consent page lets admins approve (comma-separated `MCP_OAUTH_CLIENT_IDS`).
+ * consent page lets admins approve. A comma-separated `MCP_OAUTH_CLIENT_IDS`
+ * replaces the production client, e.g. for a local Supabase stack.
  */
 export function getMcpClientIds(): string[] {
-  return (process.env.MCP_OAUTH_CLIENT_IDS ?? "")
+  return (process.env.MCP_OAUTH_CLIENT_IDS ?? PRODUCTION_MCP_CLIENT_ID)
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
@@ -36,7 +41,7 @@ export function isMcpClient(clientId: string | null | undefined): boolean {
  * `getAuthorizationDetails` for the consent flow. For a client the user
  * approved before, the Auth server approves on this call and returns only the
  * redirect URL, without the client. Revoking the user's grants to clients
- * outside MCP_OAUTH_CLIENT_IDS first means only allowlisted clients are ever
+ * outside the allowlist first means only allowlisted clients are ever
  * approved that way; any other client comes back as a pending request, which
  * the consent page refuses.
  */
