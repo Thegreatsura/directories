@@ -23,13 +23,19 @@ export type VerifiedSession = {
  */
 export async function getSession(): Promise<VerifiedSession | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+  // getClaims throws, rather than returning an error, for an expired token.
+  const result = await supabase.auth.getClaims().catch(() => null);
 
-  if (error || !data?.claims.sub || data.claims.client_id) {
+  if (
+    !result ||
+    result.error ||
+    !result.data?.claims.sub ||
+    result.data.claims.client_id
+  ) {
     return null;
   }
 
-  const { claims } = data;
+  const { claims } = result.data;
 
   return {
     user: {
