@@ -131,7 +131,7 @@ async function beginWrite(admin: Admin) {
   });
 }
 
-function pluginUrl(origin: string, slug: string) {
+function pluginUrl(slug: string, { origin }: { origin: string }) {
   return `${origin}/plugins/${slug}`;
 }
 
@@ -140,7 +140,7 @@ function summarize(plugin: PluginRow, origin: string) {
     id: plugin.id,
     slug: plugin.slug,
     name: plugin.name,
-    url: pluginUrl(origin, plugin.slug),
+    url: pluginUrl(plugin.slug, { origin }),
     live: plugin.active,
     scan_status: plugin.scan_status,
     flag_severity: plugin.flag_severity,
@@ -334,7 +334,7 @@ export function registerModerationTools(server: McpServer) {
         id: row.id,
         slug: row.slug,
         name: row.name,
-        url: pluginUrl(admin.origin, row.slug),
+        url: pluginUrl(row.slug, { origin: admin.origin }),
         description: row.description,
         repository: row.repository,
         homepage: row.homepage,
