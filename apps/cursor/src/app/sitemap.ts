@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { cacheLife, cacheTag } from "next/cache";
-import { getCompanies, getPlugins } from "@/data/queries";
+import { getCompanies, getPluginListing } from "@/data/queries";
 
 const BASE_URL = "https://cursor.directory";
 
@@ -42,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const { data: plugins } = await getPlugins({ fetchAll: true });
+  const { data: plugins } = await getPluginListing();
   if (plugins) {
     for (const plugin of plugins) {
       routes.push({
